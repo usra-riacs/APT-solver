@@ -32,9 +32,9 @@ The goal of this code is to provide a high-performance APT library that can be u
 - [PySA](https://github.com/nasa/PySA) - High Performance NASA QuAIL Python Simulated Annealing code
 
 ## Contributors
-[@NavidAaddit](https://github.com/navidaadit) Navid Aaddit
-[@PAaronLott](https://github.com/PAaronLott) Aaron Lott
-[@Mohseni](https://github.com/mohseni7) Masoud Mohseni
+- [@NavidAaddit](https://github.com/navidaadit) Navid Aaddit
+- [@PAaronLott](https://github.com/PAaronLott) Aaron Lott
+- [@Mohseni](https://github.com/mohseni7) Masoud Mohseni
 
 ## Acknowledgements
 
