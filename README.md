@@ -10,7 +10,7 @@ This repository contains:
 ## Table of Contents
 
 - [Background](#background)
-- [Install](#install)
+- [Installation](#installation)
 - [Usage](#usage)
 - [Related Efforts](#related-efforts)
 - [Contributors](#contributors)
