@@ -194,12 +194,15 @@ class APT_preprocessor:
                     else:
                         m_start = saved_state[j, :].copy().reshape(-1, 1)
 
-                    futures[executor.submit(self.MCMC_task, m_start.copy(), beta[-1], num_sweeps_MCMC,
-                                            num_sweeps_read, use_hash_table)] = j
+                    # Submit the task and map it to its index
+                    task = executor.submit(self.MCMC_task, m_start.copy(), beta[-1], num_sweeps_MCMC, num_sweeps_read,
+                                           use_hash_table)
+                    futures[task] = j
 
-            for future in as_completed(futures):
-                j = futures[future]
-                Energy[j, :], saved_state[j, :] = future.result()
+                # Process the results in the order they complete
+                for future in as_completed(futures):
+                    j = futures[future]  # Get the index mapped to this future
+                    Energy[j, :], saved_state[j, :] = future.result()
 
             # b) Compute avg_std = <E_j> over index j
             sigma_E = np.mean(np.std(Energy, axis=1))
