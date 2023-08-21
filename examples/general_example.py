@@ -38,6 +38,17 @@ def main():
     apt_prep = APT_preprocessor(J.copy(), h.copy())
 
     # run Adaptive Parallel Tempering preprocessing
+    """
+    :param num_sweeps_MCMC: An integer representing the number of MCMC sweeps in each RNG chain (default: 1000).
+    :param num_sweeps_read: An integer representing the number of last sweeps to read (default: 1000).
+    :param num_rng: An integer representing the number of independent MCMC chains  (default: 100).
+    :param beta_start: Initial beta value (default: 0.5). (chosen such that the largest spins can flip often enough)
+    :param alpha: alpha value (default: 1.25). (defines the separation of beta in the schedule)
+    :param sigma_E_val: initial energy STD value (default: 1000). (set it to large value)
+    :param beta_max: Maximum beta value (default: 30). (maximum beta allowed in the schedule)
+    :param use_hash_table: Whether to use a hash table or not (default =0).
+    :param num_cores: How many CPU cores to use in parallel (default =8).
+    """
     apt_prep.run(num_sweeps_MCMC=1000, num_sweeps_read=1000, num_rng=100,
                  beta_start=0.5, alpha=1.25, sigma_E_val=1000, beta_max=64, use_hash_table=0, num_cores=8)
 
@@ -66,6 +77,17 @@ def main():
     apt = AdaptiveParallelTempering(J.copy(), h.copy())
 
     # run Adaptive Parallel Tempering
+    """
+    Run the adaptive parallel tempering algorithm.
+    :param beta_list: A 1D numpy array representing the inverse temperatures for the replicas.
+    :param num_replicas: An integer, the number of replicas (parallel chains) to use in the algorithm.
+    :param num_sweeps_MCMC: An integer, the number of Monte Carlo sweeps to perform (default =1000) before a swap.
+    :param num_sweeps_read: An integer, the number of last sweeps to read from the chains (default =1000) before a swap.
+    :param num_swap_attempts: An integer, the number of swap attempts between chains (default = 100).
+    :param num_swapping_pairs: An integer, the number of non-overlapping replica pairs per swap attempt (default =1).
+    :param use_hash_table: Whether to use a hash table or not (default =0).
+    :param num_cores: How many CPU cores to use in parallel (default= 8).
+    """
     M, Energy = apt.run(beta_list, num_replicas=num_replicas,
                         num_sweeps_MCMC=int(1e4),
                         num_sweeps_read=int(1e3),
