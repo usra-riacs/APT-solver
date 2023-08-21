@@ -62,15 +62,6 @@ The goal of this code is to provide a high-performance APT library that can be u
     pip install -r requirements.txt
     ```
 
-
-Of course. Here's a concise and formatted `Usage` section in Markdown:
-
----
-
-I apologize for the oversight. Let's keep it professional and concise. Here's the revised `Usage` section:
-
----
-
 ## Usage
 
 To effectively utilize the APT-solver, follow the outlined steps:
