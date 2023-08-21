@@ -4,10 +4,9 @@ import time
 from scipy.sparse import csr_matrix
 import matplotlib.pyplot as plt
 import networkx as nx
+from copy import deepcopy
 from cachetools import LRUCache
 from concurrent.futures import ProcessPoolExecutor, as_completed
-
-# np.random.seed(12624755)  # Set the seed to an arbitrary number
 
 
 class APT_preprocessor:
@@ -16,9 +15,18 @@ class APT_preprocessor:
         Initialize the APT_preprocessor class with J and h.
 
         :param J: A 2D numpy array representing the coupling matrix (weights J).
-        :param h: A 1D numpy array representing the external field (biases h).
+        :param h: A 1D numpy array or list representing the external field (biases h).
         """
         self.J = J
+
+        # Convert h to a numpy array if it's a list
+        if isinstance(h, list):
+            h = np.array(h)
+
+        # If h is a 1D array, reshape it to be a 2D column vector
+        if len(h.shape) == 1:
+            h = h[:, np.newaxis]
+
         self.h = h
         self.N = J.shape[0]  # number of spins
         self.colorMap = self.greedy_coloring_saturation_largest_first()
@@ -53,7 +61,7 @@ class APT_preprocessor:
         :return M: A 2D numpy array representing the MCMC state after each sweep.
         """
         N = self.J.shape[0]
-        m = m_start
+        m = m_start.copy()
         M = np.zeros((N, num_sweeps_MCMC))
         J = csr_matrix(self.J)
 
@@ -90,7 +98,7 @@ class APT_preprocessor:
                     x = J_grouped[ijk].dot(m) + h_grouped[ijk]
                     m[group] = np.sign(np.tanh(beta * x) - 2 * np.random.rand(len(group), 1) + 1)
 
-            M[:, jj] = m.ravel()
+            M[:, jj] = m.copy().ravel()
 
         return M
 
@@ -116,30 +124,38 @@ class APT_preprocessor:
             hash_table = None
 
         # Run the MCMC algorithm with graph coloring
-        M = self.MCMC_GC(num_sweeps_MCMC, m_start, beta, hash_table, use_hash_table)
+        M = self.MCMC_GC(num_sweeps_MCMC, m_start.copy(), beta, hash_table, use_hash_table)
 
         # Only keep the last num_sweeps_read sweeps
-        mm = M[:, -num_sweeps_read:]
+        mm = M[:, -num_sweeps_read:].copy()
 
         # Initialize an array to store the energy at each sweep
         Energy = np.zeros(num_sweeps_read)
 
         # Calculate the energy at each sweep
         for kk in range(num_sweeps_read):
-            m = mm[:, kk].reshape(1, -1)
+            m = mm[:, kk].copy().reshape(1, -1)
             result = -(m @ (self.J / 2) @ m.T + m @ self.h)
             Energy[kk] = result.item()
 
         # Return the energy and the final state
         return Energy, m
 
-    def run(self, num_sweeps_MCMC=1000, num_sweeps_read=1000, num_rng=100):
+    def run(self, num_sweeps_MCMC=1000, num_sweeps_read=1000, num_rng=100,
+            beta_start=0.5, alpha=1.25, sigma_E_val=1000, beta_max=30, use_hash_table=1, num_cores=8):
         """
         Run the Adaptive Parallel Tempering (APT) preprocessing algorithm.
 
-        :param num_sweeps_MCMC: An integer representing the number of MCMC sweeps (default: 1000).
+        :param num_sweeps_MCMC: An integer representing the number of MCMC sweeps in each RNG chain (default: 1000).
         :param num_sweeps_read: An integer representing the number of last sweeps to read (default: 1000).
         :param num_rng: An integer representing the number of independent MCMC chains  (default: 100).
+        :param beta_start: Initial beta value (default: 0.5). (chosen such that the largest spins can flip often enough)
+        :param alpha: alpha value (default: 1.25). (defines the separation of beta in the schedule)
+        :param sigma_E_val: initial energy STD value (default: 1000). (set it to large value)
+        :param beta_max: Maximum beta value (default: 30). (maximum beta allowed in the schedule)
+        :param use_hash_table: Whether to use a hash table or not (default =0).
+        :param num_cores: How many CPU cores to use in parallel (default =8).
+
         """
         foldername = 'data'
         os.makedirs(os.path.join('Results', foldername), exist_ok=True)
@@ -153,15 +169,11 @@ class APT_preprocessor:
             self.h = self.h.T
 
         # 2) Initialize β_0 ~ 0.5 (chosen such that the largest spins can flip often enough)
-        beta = [0.5]
-        alpha = 1.25
+        beta = [deepcopy(beta_start)]
         iter = 1
-        sigma_E = 1000
+        sigma_E = [deepcopy(sigma_E_val)]
         sigma_E_min = 0.5 * np.min(np.abs(self.J[self.J != 0]))  # avg_std < σ_min ~ 0.5*(smallest J_ij)
-
-        beta_max = 30
         sigma = []
-        use_hash_table = 1
 
         # 4) APT loop until freezeout, typically avg_std < σ_min ~ 0.5*(smallest J_ij)
         while sigma_E > sigma_E_min:
@@ -174,15 +186,15 @@ class APT_preprocessor:
             Energy = np.zeros((num_rng, num_sweeps_read))
             saved_state = np.zeros((num_rng, self.N))
 
-            with ProcessPoolExecutor(max_workers=8) as executor:
+            with ProcessPoolExecutor(max_workers=num_cores) as executor:
                 futures = {}
                 for j in range(num_rng):
                     if iter == 1:
                         m_start = np.sign(2. * np.random.rand(self.J.shape[0], 1) - 1)
                     else:
-                        m_start = saved_state[j, :].reshape(-1, 1)
+                        m_start = saved_state[j, :].copy().reshape(-1, 1)
 
-                    futures[executor.submit(self.MCMC_task, m_start, beta[-1], num_sweeps_MCMC,
+                    futures[executor.submit(self.MCMC_task, m_start.copy(), beta[-1], num_sweeps_MCMC,
                                             num_sweeps_read, use_hash_table)] = j
 
             for future in as_completed(futures):
@@ -240,8 +252,8 @@ class APT_preprocessor:
         ax2.tick_params(axis='both', which='major', labelsize=18)
         for label in ax1.get_xticklabels() + ax1.get_yticklabels() + ax2.get_yticklabels():
             label.set_weight('bold')
-        plt.show()
-        # plt.savefig('beta_sigma.png')
+        #plt.show()
+        plt.savefig('beta_sigma.png')
 
 
 def main():
@@ -252,8 +264,17 @@ def main():
     # print(J)
     # print(h)
 
-    apt_prep = APT_preprocessor(J, h)
-    apt_prep.run(num_sweeps_MCMC=10000, num_sweeps_read=1000, num_rng=100)
+    # Begin preprocessing with APT
+    print("\n[INFO] Starting APT preprocessing...")
+
+    # create an APT_preprocessor instance
+    apt_prep = APT_preprocessor(J.copy(), h.copy())
+
+    # run Adaptive Parallel Tempering preprocessing
+    apt_prep.run(num_sweeps_MCMC=1000, num_sweeps_read=1000, num_rng=100,
+                 beta_start=0.5, alpha=1.25, sigma_E_val=1000, beta_max=64, use_hash_table=0, num_cores=8)
+
+    print("\n[INFO] APT preprocessing complete.")
 
 
 if __name__ == '__main__':

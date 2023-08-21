@@ -16,27 +16,23 @@ class AdaptiveParallelTempering:
     The AdaptiveParallelTempering class is used to implement the Adaptive Parallel Tempering algorithm.
     """
 
-    def __init__(self, J, h, num_replicas, num_sweeps_MCMC, num_sweeps_read, num_swap_attempts, num_swapping_pairs=1):
+    def __init__(self, J, h):
         """
         Initialize an AdaptiveParallelTempering object.
-
-        :param num_replicas: An integer, the number of replicas (parallel chains) to use in the algorithm.
-        :param num_sweeps_MCMC: An integer, the number of Monte Carlo sweeps to perform.
-        :param num_sweeps_read: An integer, the number of last sweeps to read from the chains.
-        :param num_swap_attempts: An integer, the number of swap attempts between chains.
-        :param num_swapping_pairs: An integer, the number of replica pairs per swap attempt (default =1)
-        :param J: A 2D numpy array representing the interaction matrix in a spin glass model.
-        :param h: A 1D numpy array representing the external magnetic field in a spin glass model.
+        :param J: A 2D numpy array representing the coupling matrix (weights J).
+        :param h: A 1D numpy array or list representing the external field (biases h).
         """
         self.J = J
+
+        # Convert h to a numpy array if it's a list
+        if isinstance(h, list):
+            h = np.array(h)
+
+        # If h is a 1D array, reshape it to be a 2D column vector
+        if len(h.shape) == 1:
+            h = h[:, np.newaxis]
         self.h = h
-        self.num_replicas = num_replicas
-        self.num_sweeps_MCMC = num_sweeps_MCMC
-        self.num_sweeps_read = num_sweeps_read
-        self.num_swap_attempts = num_swap_attempts
-        self.num_sweeps_MCMC_per_swap = self.num_sweeps_MCMC // self.num_swap_attempts
-        self.num_sweeps_read_per_swap = self.num_sweeps_read // self.num_swap_attempts
-        self.num_swapping_pairs = num_swapping_pairs
+
         self.colorMap = self.greedy_coloring_saturation_largest_first()
 
     def replica_energy(self, M, num_sweeps):
@@ -85,7 +81,7 @@ class AdaptiveParallelTempering:
         :return M: A 2D numpy array representing the MCMC state after each sweep.
         """
         N = self.J.shape[0]
-        m = m_start
+        m = m_start.copy()
         M = np.zeros((N, num_sweeps_MCMC))
         J = csr_matrix(self.J)
 
@@ -122,7 +118,7 @@ class AdaptiveParallelTempering:
                     x = J_grouped[ijk].dot(m) + h_grouped[ijk]
                     m[group] = np.sign(np.tanh(beta * x) - 2 * np.random.rand(len(group), 1) + 1)
 
-            M[:, jj] = m.ravel()
+            M[:, jj] = m.copy().ravel()
 
         return M
 
@@ -143,7 +139,7 @@ class AdaptiveParallelTempering:
             hash_table = LRUCache(maxsize=10000)
         else:
             hash_table = None
-        return self.MCMC_GC(num_sweeps_MCMC, m_start, beta_list[replica_i - 1], hash_table, use_hash_table)
+        return self.MCMC_GC(num_sweeps_MCMC, m_start.copy(), beta_list[replica_i - 1], hash_table, use_hash_table)
 
     def select_non_overlapping_pairs(self, all_pairs):
         """
@@ -166,11 +162,32 @@ class AdaptiveParallelTempering:
                                p[0] != pair[0] and p[0] != pair[1] and p[1] != pair[0] and p[1] != pair[1]]
         return selected_pairs
 
-    def run(self, beta_list):
+    def run(self, beta_list, num_replicas, num_sweeps_MCMC=1000, num_sweeps_read=1000, num_swap_attempts=100,
+            num_swapping_pairs=1, use_hash_table=0, num_cores=8):
         """
         Run the adaptive parallel tempering algorithm.
         :param beta_list: A 1D numpy array representing the inverse temperatures for the replicas.
+        :param num_replicas: An integer, the number of replicas (parallel chains) to use in the algorithm.
+        :param num_sweeps_MCMC: An integer, the number of Monte Carlo sweeps to perform (default =1000) before a swap.
+        :param num_sweeps_read: An integer, the number of last sweeps to read from the chains (default =1000) before a swap.
+        :param num_swap_attempts: An integer, the number of swap attempts between chains (default = 100).
+        :param num_swapping_pairs: An integer, the number of non-overlapping replica pairs per swap attempt (default =1).
+        :param use_hash_table: Whether to use a hash table or not (default =0).
+        :param num_cores: How many CPU cores to use in parallel (default= 8).
+
+        :return: Tuple containing:
+        - M (2D numpy array): Spin states for each replica. Rows correspond to replicas and columns to states.
+        - Energy (1D numpy array): Energy values corresponding to each replica.
         """
+        self.num_replicas = num_replicas
+        self.num_sweeps_MCMC = num_sweeps_MCMC
+        self.num_sweeps_read = num_sweeps_read
+        self.num_swap_attempts = num_swap_attempts
+        self.num_sweeps_MCMC_per_swap = self.num_sweeps_MCMC // self.num_swap_attempts
+        self.num_sweeps_read_per_swap = self.num_sweeps_read // self.num_swap_attempts
+        self.num_swapping_pairs = num_swapping_pairs
+        self.use_hash_table = use_hash_table
+
         num_spins = self.J.shape[0]
         count = np.zeros(self.num_swap_attempts)
         swap_attempted_replicas = np.zeros((self.num_swap_attempts * self.num_swapping_pairs, 2))
@@ -182,35 +199,34 @@ class AdaptiveParallelTempering:
         # Initialize states for all replicas
         M = np.zeros((self.num_replicas * num_spins, self.num_sweeps_MCMC))
         m_start = np.sign(2 * np.random.rand(self.num_replicas * num_spins, 1) - 1)
-        use_hash_table = 0
 
         swap_index = 0
 
-        with ProcessPoolExecutor(max_workers=8) as executor:
+        with ProcessPoolExecutor(max_workers=num_cores) as executor:
             for ii in range(self.num_swap_attempts):
                 print(f"\nRunning swap attempt = {ii + 1}")
                 start_time = time.time()
 
                 # Run MCMC for each replica in parallel
                 futures = [executor.submit(self.MCMC_task, replica_i, self.num_sweeps_MCMC,
-                                           m_start[(replica_i - 1) * num_spins:replica_i * num_spins], beta_list,
-                                           use_hash_table) for replica_i in range(1, self.num_replicas + 1)]
+                                           m_start[(replica_i - 1) * num_spins:replica_i * num_spins].copy(), beta_list,
+                                           self.use_hash_table) for replica_i in range(1, self.num_replicas + 1)]
                 M_results = [future.result() for future in futures]
 
                 for replica_i, M_replica in enumerate(M_results, start=1):
-                    M[(replica_i - 1) * num_spins:replica_i * num_spins, :] = M_replica
+                    M[(replica_i - 1) * num_spins:replica_i * num_spins, :] = M_replica.copy()
 
                 # Truncate the state matrix for reading and update the starting states
-                mm = M[:, -self.num_sweeps_read_per_swap:].T
-                m_start = M[:, -1].reshape(-1, 1)
+                mm = M[:, -self.num_sweeps_read_per_swap:].copy().T
+                m_start = M[:, -1].copy().reshape(-1, 1)
 
                 selected_pairs = self.select_non_overlapping_pairs(all_pairs)
 
                 # Attempt to swap states of each selected pair of replicas
                 for pair in selected_pairs:
                     sel, next = pair
-                    m_sel = mm[-1, (sel - 1) * num_spins:sel * num_spins].T
-                    m_next = mm[-1, (next - 1) * num_spins:next * num_spins].T
+                    m_sel = mm[-1, (sel - 1) * num_spins:sel * num_spins].copy().T
+                    m_next = mm[-1, (next - 1) * num_spins:next * num_spins].copy().T
 
                     E_sel = -m_sel.T @ self.J @ m_sel / 2 - m_sel.T @ self.h
                     E_next = -m_next.T @ self.J @ m_next / 2 - m_next.T @ self.h
@@ -232,8 +248,8 @@ class AdaptiveParallelTempering:
                         print(f"Swapping {int(sum(count))}th time")
 
                         # Swap the states of the selected replicas
-                        m_start[(sel - 1) * num_spins:sel * num_spins] = m_next.reshape(-1, 1)
-                        m_start[(next - 1) * num_spins:next * num_spins] = m_sel.reshape(-1, 1)
+                        m_start[(sel - 1) * num_spins:sel * num_spins] = m_next.copy().reshape(-1, 1)
+                        m_start[(next - 1) * num_spins:next * num_spins] = m_sel.copy().reshape(-1, 1)
 
                     swap_index += 1
 
@@ -255,6 +271,7 @@ class AdaptiveParallelTempering:
 
         # Plot the energy traces
         self.plot_energies(EE1_list, beta_list)
+        return M, Energy
 
     def plot_energies(self, EE1_list, beta_list):
         """
@@ -270,39 +287,48 @@ class AdaptiveParallelTempering:
         plt.ylabel('Energy')
         plt.title('Energy traces for different replicas')
         plt.legend()
-        plt.show()
-        # plt.savefig('APT_energy.png')
+        # plt.show()
+        plt.savefig('APT_energy.png')
+
 
 
 def main():
-
     # Load the coupling and external field matrices, and the list of inverse temperatures
     J = np.load('J.npy')
     h = np.load('h.npy')
     J = csr_matrix(J)  # Convert the dense matrix to a sparse one
-    beta_list = np.load('beta_list_python.npy')
-    num_replicas = beta_list.shape[0]
 
-    # uncomment if you want to manually select the inverse temperatures for the replicas from beta_list
+    beta_list = np.load('beta_list_python.npy')
+    print(f"[INFO] Beta List: {beta_list}")
+
+    # # uncomment if you want to manually select the inverse temperatures for the replicas from beta_list
     # startingBeta = 18
     # num_replicas = 12
     # selectedBeta = range(startingBeta, startingBeta + num_replicas)
     # beta_list = beta_list[selectedBeta]
+
+    num_replicas = beta_list.shape[0]
+    print(f"[INFO] Number of replicas: {num_replicas}")
+
     norm_factor = np.max(np.abs(J))
     beta_list = beta_list / norm_factor
-    print(beta_list)
+    print(f"[INFO] Normalized Beta List: {beta_list}")
 
-    # Create an AdaptiveParallelTempering instance and run it
-    ap = AdaptiveParallelTempering(
-        J=J,
-        h=h,
-        num_replicas=num_replicas,
-        num_sweeps_MCMC=int(1e4),
-        num_sweeps_read=int(1e3),
-        num_swap_attempts=int(1e2),
-        num_swapping_pairs=3
-    )
-    ap.run(beta_list)
+    # Initiate the main APT run
+    print("\n[INFO] Starting main Adaptive Parallel Tempering process...")
+
+    # Create an AdaptiveParallelTempering instance
+    apt = AdaptiveParallelTempering(J.copy(), h.copy())
+
+    # run Adaptive Parallel Tempering
+    M, Energy = apt.run(beta_list, num_replicas=num_replicas,
+                        num_sweeps_MCMC=int(1e4),
+                        num_sweeps_read=int(1e3),
+                        num_swap_attempts=int(1e2),
+                        num_swapping_pairs=1, use_hash_table=0, num_cores=8)
+
+    print(M)
+    print(Energy)
 
 
 if __name__ == '__main__':
