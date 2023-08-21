@@ -106,14 +106,11 @@ M, Energy = apt.run(beta_list, num_replicas=beta_list.shape[0],
 
 For more detailed examples, refer to the [examples](https://github.com/usra-riacs/APT-solver/tree/main/examples) directory in the repository.
 
----
 
-Again, I apologize for the earlier oversight. Thank you for pointing it out.
 ### 4. Example Script
 
 For a full demonstration of the APT-solver in action, refer to the example script located in the `examples` folder of this repository.
 
----
 
 
 ## Related Efforts
