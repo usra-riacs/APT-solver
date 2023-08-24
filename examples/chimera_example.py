@@ -43,7 +43,7 @@ def txt_to_A_droplet(txtfile):
 
 
 def main():
-    size_chimera = 512  # chimera instance size
+    size_chimera = 128  # chimera instance size
     instance = 1  # index of chimera instance
     txtfile = f'./Chimera_droplet_instances/chimera{size_chimera}_spinglass_power/{instance:03}.txt'
     J, h = txt_to_A_droplet(txtfile)
@@ -68,12 +68,12 @@ def main():
     :param use_hash_table: Whether to use a hash table or not (default =0).
     :param num_cores: How many CPU cores to use in parallel (default =8).
     """
-    apt_prep.run(num_sweeps_MCMC=1000, num_sweeps_read=1000, num_rng=100,
+    beta, sigma = apt_prep.run(num_sweeps_MCMC=1000, num_sweeps_read=1000, num_rng=100,
                  beta_start=0.5, alpha=1.25, sigma_E_val=1000, beta_max=64, use_hash_table=0, num_cores=8)
 
     print("\n[INFO] APT preprocessing complete.")
 
-    beta_list = np.load('beta_list_python.npy')
+    beta_list = np.array(beta)
     print(f"[INFO] Beta List: {beta_list}")
 
     # # uncomment if you want to manually select the inverse temperatures for the replicas from beta_list

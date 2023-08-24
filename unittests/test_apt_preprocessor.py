@@ -29,16 +29,18 @@ class TestAPTPreprocessor(unittest.TestCase):
         self.assertTrue(np.array_equal(self.apt_preprocessor.J, self.J))
         self.assertTrue(np.array_equal(self.apt_preprocessor.h, self.h))
 
-    def test_run_method_creates_file(self):
+    def test_run_method_outputs_and_file_creation(self):
         """Test if the run method generates the expected output file."""
         if os.path.exists('beta_list_python.npy'):
             os.remove('beta_list_python.npy')  # Ensure the file is not there before the test
 
-        self.apt_preprocessor.run(num_sweeps_MCMC=10, num_sweeps_read=10, num_rng=2,
-                                  beta_start=0.5, alpha=1.25, sigma_E_val=1000,
-                                  beta_max=32, use_hash_table=0, num_cores=1)
+        beta, sigma = self.apt_preprocessor.run(num_sweeps_MCMC=10, num_sweeps_read=10, num_rng=2,
+                                                beta_start=0.5, alpha=1.25, sigma_E_val=1000,
+                                                beta_max=32, use_hash_table=0, num_cores=1)
 
-        self.assertTrue(os.path.exists('beta_list_python.npy'))
+        self.assertTrue(isinstance(beta, list))  # Verify beta is a list
+        self.assertTrue(isinstance(sigma, list))  # Verify sigma is a list
+        self.assertTrue(os.path.exists('beta_list_python.npy'))  # Verify the output file was created
 
     def test_valid_parameters(self):
         """Test if the parameters passed are valid."""

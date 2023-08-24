@@ -327,7 +327,7 @@ def main():
                         num_swap_attempts=int(1e2),
                         num_swapping_pairs=1, use_hash_table=0, num_cores=8)
 
-    print(M)
+    #print(M)
     print(Energy)
 
 

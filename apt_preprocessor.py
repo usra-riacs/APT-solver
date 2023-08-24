@@ -175,6 +175,7 @@ class APT_preprocessor:
         sigma_E_min = 0.5 * np.min(np.abs(self.J[self.J != 0]))  # avg_std < σ_min ~ 0.5*(smallest J_ij)
         sigma = []
 
+        saved_state = np.zeros((num_rng, self.N))
         # 4) APT loop until freezeout, typically avg_std < σ_min ~ 0.5*(smallest J_ij)
         while sigma_E > sigma_E_min:
             start_time = time.time()
@@ -184,7 +185,6 @@ class APT_preprocessor:
                 beta.append(beta[-1] + alpha / sigma_E)
 
             Energy = np.zeros((num_rng, num_sweeps_read))
-            saved_state = np.zeros((num_rng, self.N))
 
             with ProcessPoolExecutor(max_workers=num_cores) as executor:
                 futures = {}
@@ -223,13 +223,14 @@ class APT_preprocessor:
             end_time = time.time()
             print(f"Elapsed time: {end_time - start_time:.2f} seconds")
 
-        print('beta =')
-        print(beta)
-        print('sigma =')
-        print(sigma)
+        # print('beta =')
+        # print(beta)
+        # print('sigma =')
+        # print(sigma)
         np.save('beta_list_python.npy', beta)
         np.save('sigma_list_python.npy', sigma)
         self.plot_results(beta, sigma)
+        return beta, sigma
 
     def plot_results(self, beta, sigma):
         """
@@ -274,10 +275,15 @@ def main():
     apt_prep = APT_preprocessor(J.copy(), h.copy())
 
     # run Adaptive Parallel Tempering preprocessing
-    apt_prep.run(num_sweeps_MCMC=1000, num_sweeps_read=1000, num_rng=100,
+    beta, sigma = apt_prep.run(num_sweeps_MCMC=1000, num_sweeps_read=1000, num_rng=100,
                  beta_start=0.5, alpha=1.25, sigma_E_val=1000, beta_max=64, use_hash_table=0, num_cores=8)
 
     print("\n[INFO] APT preprocessing complete.")
+
+    beta_list = np.array(beta)
+    print(f"[INFO] Beta List: {beta_list}")
+    num_replicas = beta_list.shape[0]
+    print(f"[INFO] Number of replicas: {num_replicas}")
 
 
 if __name__ == '__main__':
