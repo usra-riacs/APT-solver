@@ -33,8 +33,6 @@ class AdaptiveParallelTempering:
             h = h[:, np.newaxis]
         self.h = h
 
-        self.colorMap = self.greedy_coloring_saturation_largest_first()
-
     def replica_energy(self, M, num_sweeps):
         """
         Calculate the energy of a given replica over a number of sweeps.
@@ -51,74 +49,45 @@ class AdaptiveParallelTempering:
         minEnergy = np.min(EE1)
         return minEnergy, EE1
 
-    def greedy_coloring_saturation_largest_first(self):
+    def MCMC(self, num_sweeps, m_start, beta, hash_table=None, use_hash_table=False):
         """
-        Perform greedy coloring using the saturation largest first strategy.
+        Implements the Markov Chain Monte Carlo (MCMC) method using Gibbs sampling.
 
-        :return colorMap: A 1D numpy array containing the colormap of the graph.
+        Parameters:
+        - num_sweeps (int): Number of MCMC sweeps to be performed.
+        - m_start (np.array[N,]): Initial seed value of the states, where N is the size of the graph.
+        - beta (float): Inverse temperature.
+        - hash_table (LRUCache, optional): An LRUCache object for storing previously computed dE values.
+        - use_hash_table (bool, optional, default=False): If set to True, utilizes the hash table for caching results.
+
+        Returns:
+        - M (np.array[N, num_sweeps]): Matrix containing all the sweeps in bipolar form.
         """
-        # Create a NetworkX graph from the J matrix
-        G = nx.Graph(self.J)
 
-        # Perform greedy coloring with the saturation largest first strategy
-        color_map = nx.coloring.greedy_color(G, strategy='saturation_largest_first')
-
-        # Convert the color map to a 1D numpy array
-        colorMap = np.array([color_map[node] for node in G.nodes])
-
-        return colorMap
-
-    def MCMC_GC(self, num_sweeps_MCMC, m_start, beta, hash_table, use_hash_table=0):
-        """
-        Perform MCMC with graph coloring.
-
-        :param num_sweeps_MCMC: An integer representing the number of MCMC sweeps.
-        :param m_start: A 1D numpy array representing the initial state.
-        :param beta: A float representing the inverse temperature.
-        :param hash_table: A LRUCache object used to store previously calculated dE values.
-        :param use_hash_table: A boolean flag. If True, a hash table will be used for caching results. (default = 0)
-
-        :return M: A 2D numpy array representing the MCMC state after each sweep.
-        """
         N = self.J.shape[0]
-        m = m_start.copy()
-        M = np.zeros((N, num_sweeps_MCMC))
-        J = csr_matrix(self.J)
+        m = np.asarray(m_start).copy().reshape(-1, 1)
+        M = np.zeros((N, num_sweeps))
 
-        if self.h.shape[0] == 1:
-            self.h = self.h.T
+        for jj in range(num_sweeps):
+            spin_state = tuple(m.ravel())
 
-        # Group spins by color
-        required_colors = len(np.unique(self.colorMap))
-        Groups = [None] * required_colors
-        for k in range(required_colors):
-            Groups[k] = np.where(self.colorMap == k)[0]
-
-        # Create a list of grouped J and h matrices
-        J_grouped = [J[Groups[k], :] for k in range(required_colors)]
-        h_grouped = [self.h[Groups[k]] for k in range(required_colors)]
-
-        for jj in range(num_sweeps_MCMC):
-            for ijk in range(required_colors):
-                group = Groups[ijk]
-                spin_state = tuple(m.ravel())
-
+            for kk in np.random.permutation(N):
                 if use_hash_table:
                     if not isinstance(hash_table, LRUCache):
-                        raise ValueError("hash_table must be an instance of cachetools.LRUCache")
+                        raise ValueError("hash_table must be an instance of LRUCache")
 
                     if spin_state in hash_table:
                         dE = hash_table[spin_state]
                     else:
-                        dE = J.dot(m) + self.h
+                        dE = self.J.dot(m) + self.h
                         hash_table[spin_state] = dE
 
-                    m[group] = np.sign(np.tanh(beta * dE[group]) - 2 * np.random.rand(len(group), 1) + 1)
+                    m[kk] = np.sign(np.tanh(beta * dE[kk]) - 2 * np.random.rand() + 1)
                 else:
-                    x = J_grouped[ijk].dot(m) + h_grouped[ijk]
-                    m[group] = np.sign(np.tanh(beta * x) - 2 * np.random.rand(len(group), 1) + 1)
+                    x = self.J.dot(m) + self.h
+                    m[kk] = np.sign(np.tanh(beta * x[kk]) - 2 * np.random.rand() + 1)
 
-            M[:, jj] = m.copy().ravel()
+            M[:, jj] = m.ravel()
 
         return M
 
@@ -127,7 +96,7 @@ class AdaptiveParallelTempering:
         Perform a Monte Carlo simulation for a single task.
 
         This method is designed to be run in a separate process.
-
+        :param replica_i: An integer representing the replica index.
         :param m_start: A 1D numpy array representing the initial state.
         :param beta_list: A 1D numpy array representing the inverse temperatures for the replicas.
         :param num_sweeps_MCMC: An integer representing the number of MCMC sweeps.
@@ -139,7 +108,7 @@ class AdaptiveParallelTempering:
             hash_table = LRUCache(maxsize=10000)
         else:
             hash_table = None
-        return self.MCMC_GC(num_sweeps_MCMC, m_start.copy(), beta_list[replica_i - 1], hash_table, use_hash_table)
+        return self.MCMC(num_sweeps_MCMC, m_start.copy(), beta_list[replica_i - 1], hash_table, use_hash_table)
 
     def select_non_overlapping_pairs(self, all_pairs):
         """
@@ -168,8 +137,8 @@ class AdaptiveParallelTempering:
         Run the adaptive parallel tempering algorithm.
         :param beta_list: A 1D numpy array representing the inverse temperatures for the replicas.
         :param num_replicas: An integer, the number of replicas (parallel chains) to use in the algorithm.
-        :param num_sweeps_MCMC: An integer, the number of Monte Carlo sweeps to perform (default =1000) before a swap.
-        :param num_sweeps_read: An integer, the number of last sweeps to read from the chains (default =1000) before a swap.
+        :param num_sweeps_MCMC: An integer, the number of Monte Carlo sweeps to perform (default =1000)
+        :param num_sweeps_read: An integer, the number of last sweeps to read from the chains (default =1000)
         :param num_swap_attempts: An integer, the number of swap attempts between chains (default = 100).
         :param num_swapping_pairs: An integer, the number of non-overlapping replica pairs per swap attempt (default =1).
         :param use_hash_table: Whether to use a hash table or not (default =0).
@@ -197,7 +166,7 @@ class AdaptiveParallelTempering:
         all_pairs = [(i, i + 1) for i in range(1, self.num_replicas)]
 
         # Initialize states for all replicas
-        M = np.zeros((self.num_replicas * num_spins, self.num_sweeps_MCMC))
+        M = np.zeros((self.num_replicas * num_spins, self.num_sweeps_MCMC_per_swap))
         m_start = np.sign(2 * np.random.rand(self.num_replicas * num_spins, 1) - 1)
 
         swap_index = 0
@@ -208,7 +177,7 @@ class AdaptiveParallelTempering:
                 start_time = time.time()
 
                 # Run MCMC for each replica in parallel
-                futures = [executor.submit(self.MCMC_task, replica_i, self.num_sweeps_MCMC,
+                futures = [executor.submit(self.MCMC_task, replica_i, self.num_sweeps_MCMC_per_swap,
                                            m_start[(replica_i - 1) * num_spins:replica_i * num_spins].copy(), beta_list,
                                            self.use_hash_table) for replica_i in range(1, self.num_replicas + 1)]
                 M_results = [future.result() for future in futures]
@@ -261,7 +230,7 @@ class AdaptiveParallelTempering:
         EE1_list = []
         for look_replica in range(1, self.num_replicas + 1):
             M_replica = M[(look_replica - 1) * self.J.shape[1]:look_replica * self.J.shape[1], :]
-            minEnergy, EE1 = self.replica_energy(M_replica, self.num_sweeps_read)
+            minEnergy, EE1 = self.replica_energy(M_replica, self.num_sweeps_read_per_swap)
             Energy[look_replica - 1] = minEnergy
             EE1_list.append(EE1)
 

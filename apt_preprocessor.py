@@ -29,76 +29,46 @@ class APT_preprocessor:
 
         self.h = h
         self.N = J.shape[0]  # number of spins
-        self.colorMap = self.greedy_coloring_saturation_largest_first()
 
-    def greedy_coloring_saturation_largest_first(self):
+    def MCMC(self, num_sweeps, m_start, beta, hash_table=None, use_hash_table=False):
         """
-        Perform greedy coloring using the saturation largest first strategy.
+        Implements the Markov Chain Monte Carlo (MCMC) method using Gibbs sampling.
 
-        :return colorMap: A 1D numpy array containing the colormap of the graph.
+        Parameters:
+        - num_sweeps (int): Number of MCMC sweeps to be performed.
+        - m_start (np.array[N,]): Initial seed value of the states, where N is the size of the graph.
+        - beta (float): Inverse temperature.
+        - hash_table (LRUCache, optional): An LRUCache object for storing previously computed dE values.
+        - use_hash_table (bool, optional, default=False): If set to True, utilizes the hash table for caching results.
+
+        Returns:
+        - M (np.array[N, num_sweeps]): Matrix containing all the sweeps in bipolar form.
         """
-        # Create a NetworkX graph from the J matrix
-        G = nx.Graph(self.J)
 
-        # Perform greedy coloring with the saturation largest first strategy
-        color_map = nx.coloring.greedy_color(G, strategy='saturation_largest_first')
-
-        # Convert the color map to a 1D numpy array
-        colorMap = np.array([color_map[node] for node in G.nodes])
-
-        return colorMap
-
-    def MCMC_GC(self, num_sweeps_MCMC, m_start, beta, hash_table, use_hash_table=0):
-        """
-        Perform MCMC with graph coloring.
-
-        :param num_sweeps_MCMC: An integer representing the number of MCMC sweeps.
-        :param m_start: A 1D numpy array representing the initial state.
-        :param beta: A float representing the inverse temperature.
-        :param hash_table: A LRUCache object used to store previously calculated dE values.
-        :param use_hash_table: A boolean flag. If True, a hash table will be used for caching results. (default = 0)
-
-        :return M: A 2D numpy array representing the MCMC state after each sweep.
-        """
         N = self.J.shape[0]
-        m = m_start.copy()
-        M = np.zeros((N, num_sweeps_MCMC))
-        J = csr_matrix(self.J)
+        m = np.asarray(m_start).copy().reshape(-1, 1)
+        M = np.zeros((N, num_sweeps))
 
-        if self.h.shape[0] == 1:
-            self.h = self.h.T
+        for jj in range(num_sweeps):
+            spin_state = tuple(m.ravel())
 
-        # Group spins by color
-        required_colors = len(np.unique(self.colorMap))
-        Groups = [None] * required_colors
-        for k in range(required_colors):
-            Groups[k] = np.where(self.colorMap == k)[0]
-
-        # Create a list of grouped J and h matrices
-        J_grouped = [J[Groups[k], :] for k in range(required_colors)]
-        h_grouped = [self.h[Groups[k]] for k in range(required_colors)]
-
-        for jj in range(num_sweeps_MCMC):
-            for ijk in range(required_colors):
-                group = Groups[ijk]
-                spin_state = tuple(m.ravel())
-
+            for kk in np.random.permutation(N):
                 if use_hash_table:
                     if not isinstance(hash_table, LRUCache):
-                        raise ValueError("hash_table must be an instance of cachetools.LRUCache")
+                        raise ValueError("hash_table must be an instance of LRUCache")
 
                     if spin_state in hash_table:
                         dE = hash_table[spin_state]
                     else:
-                        dE = J.dot(m) + self.h
+                        dE = self.J.dot(m) + self.h
                         hash_table[spin_state] = dE
 
-                    m[group] = np.sign(np.tanh(beta * dE[group]) - 2 * np.random.rand(len(group), 1) + 1)
+                    m[kk] = np.sign(np.tanh(beta * dE[kk]) - 2 * np.random.rand() + 1)
                 else:
-                    x = J_grouped[ijk].dot(m) + h_grouped[ijk]
-                    m[group] = np.sign(np.tanh(beta * x) - 2 * np.random.rand(len(group), 1) + 1)
+                    x = self.J.dot(m) + self.h
+                    m[kk] = np.sign(np.tanh(beta * x[kk]) - 2 * np.random.rand() + 1)
 
-            M[:, jj] = m.copy().ravel()
+            M[:, jj] = m.ravel()
 
         return M
 
@@ -123,8 +93,8 @@ class APT_preprocessor:
         else:
             hash_table = None
 
-        # Run the MCMC algorithm with graph coloring
-        M = self.MCMC_GC(num_sweeps_MCMC, m_start.copy(), beta, hash_table, use_hash_table)
+        # Run the MCMC algorithm
+        M = self.MCMC(num_sweeps_MCMC, m_start.copy(), beta, hash_table, use_hash_table)
 
         # Only keep the last num_sweeps_read sweeps
         mm = M[:, -num_sweeps_read:].copy()
