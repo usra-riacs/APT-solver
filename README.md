@@ -117,7 +117,7 @@ For a full demonstration of the APT-solver in action, refer to the example scrip
 - [PySA](https://github.com/nasa/PySA) - High Performance NASA QuAIL Python Simulated Annealing code
 
 ## Contributors
-- [@NavidAaddit](https://github.com/navidaadit) Navid Aaddit
+- [@NavidAadit](https://github.com/navidaadit) Navid Aadit
 - [@PAaronLott](https://github.com/PAaronLott) Aaron Lott
 - [@Mohseni](https://github.com/mohseni7) Masoud Mohseni
 
