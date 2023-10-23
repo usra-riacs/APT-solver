@@ -115,6 +115,7 @@ For a full demonstration of the APT-solver in action, refer to the example scrip
 
 ## Related Efforts
 - [PySA](https://github.com/nasa/PySA) - High Performance NASA QuAIL Python Simulated Annealing code
+- [Nonlocal-Monte-Carlo](https://github.com/usra-riacs/Nonlocal-Monte-Carlo) - High Performance Nonlocal Monte Carlo + Adaptive Parallel Tempering (NMC and NPT) code
 
 ## Contributors
 - [@NavidAadit](https://github.com/navidaadit) Navid Aadit
