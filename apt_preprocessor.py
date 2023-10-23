@@ -50,9 +50,10 @@ class APT_preprocessor:
         M = np.zeros((N, num_sweeps))
 
         for jj in range(num_sweeps):
-            spin_state = tuple(m.ravel())
 
             for kk in np.random.permutation(N):
+
+                spin_state = tuple(m.ravel())
                 if use_hash_table:
                     if not isinstance(hash_table, LRUCache):
                         raise ValueError("hash_table must be an instance of LRUCache")

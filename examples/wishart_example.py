@@ -107,8 +107,8 @@ def main():
     Run the adaptive parallel tempering algorithm.
     :param beta_list: A 1D numpy array representing the inverse temperatures for the replicas.
     :param num_replicas: An integer, the number of replicas (parallel chains) to use in the algorithm.
-    :param num_sweeps_MCMC: An integer, the number of Monte Carlo sweeps to perform (default =1000) before a swap.
-    :param num_sweeps_read: An integer, the number of last sweeps to read from the chains (default =1000) before a swap.
+    :param num_sweeps_MCMC: An integer, the number of Monte Carlo sweeps to perform (default =1000).
+    :param num_sweeps_read: An integer, the number of last sweeps to read from the chains (default =1000).
     :param num_swap_attempts: An integer, the number of swap attempts between chains (default = 100).
     :param num_swapping_pairs: An integer, the number of non-overlapping replica pairs per swap attempt (default =1).
     :param use_hash_table: Whether to use a hash table or not (default =0).

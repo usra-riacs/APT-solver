@@ -43,7 +43,7 @@ def txt_to_A_droplet(txtfile):
 
 
 def main():
-    size_chimera = 128  # chimera instance size
+    size_chimera = 512  # chimera instance size
     instance = 1  # index of chimera instance
     txtfile = f'./Chimera_droplet_instances/chimera{size_chimera}_spinglass_power/{instance:03}.txt'
     J, h = txt_to_A_droplet(txtfile)
@@ -100,16 +100,16 @@ def main():
     Run the adaptive parallel tempering algorithm.
     :param beta_list: A 1D numpy array representing the inverse temperatures for the replicas.
     :param num_replicas: An integer, the number of replicas (parallel chains) to use in the algorithm.
-    :param num_sweeps_MCMC: An integer, the number of Monte Carlo sweeps to perform (default =1000) before a swap.
-    :param num_sweeps_read: An integer, the number of last sweeps to read from the chains (default =1000) before a swap.
+    :param num_sweeps_MCMC: An integer, the number of Monte Carlo sweeps to perform (default =1000).
+    :param num_sweeps_read: An integer, the number of last sweeps to read from the chains (default =1000).
     :param num_swap_attempts: An integer, the number of swap attempts between chains (default = 100).
     :param num_swapping_pairs: An integer, the number of non-overlapping replica pairs per swap attempt (default =1).
     :param use_hash_table: Whether to use a hash table or not (default =0).
     :param num_cores: How many CPU cores to use in parallel (default= 8).
     """
     M, Energy = apt.run(beta_list, num_replicas=num_replicas,
-                        num_sweeps_MCMC=int(1e4),
-                        num_sweeps_read=int(1e3),
+                        num_sweeps_MCMC=int(1e2),
+                        num_sweeps_read=int(1e2),
                         num_swap_attempts=int(1e2),
                         num_swapping_pairs=1, use_hash_table=0, num_cores=8)
 
