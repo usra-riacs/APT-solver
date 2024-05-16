@@ -6,9 +6,15 @@ authors:
   email: maadit@ucsb.edu
   affiliation: University of California Santa Barbara
   orcid: 'https://orcid.org/0000-0001-9933-0728'
-- family-names: "Lisa"
-  given-names: "Mona"
-  orcid: "https://orcid.org/0000-0000-0000-0000"
+- given-names: P. Aaron
+  family-names: Lott
+  email: plott@usra.edu
+  affiliation: Universities Space Research Association
+  orcid: 'https://orcid.org/0000-0002-9718-9641'
+- given-names: Masoud
+  family-names: Mohseni
+  affiliation: Hewlett Packard Enterprise
+  email: masoud.mohseni@hpe.com
 title: "APT-solver: An Adaptive Parallel Tempering Solver"
 version: 1.0.0
 date-released: 2023-08-04
