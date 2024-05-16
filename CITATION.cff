@@ -1,6 +1,15 @@
 cff-version: 1.2.0
-message: "If you use this software, please cite it as below."
+title: 'APT-Solver Adaptive Parallel Tempering Solver'
+message: >-
+  If you use this software, please cite it using the
+  metadata from this file.
+type: software
 authors:
+- given-names: Navid
+    family-names: Aadit
+    email: maadit@ucsb.edu
+    affiliation: University of California Santa Barbara
+    orcid: 'https://orcid.org/0000-0001-9933-0728'
 - given-names: P. Aaron
     family-names: Lott
     email: plott@usra.edu
@@ -10,7 +19,6 @@ authors:
     family-names: Mohseni
     affiliation: Hewlett Packard Enterprise
     email: masoud.mohseni@hpe.com
-title: "APT-solver"
+repository-code: 'https://github.com/usra-riacs/APT-solver'
 version: 1.0.0
 date-released: 2023-08-04
-url: "https://github.com/usra-riacs/APT-solver"
