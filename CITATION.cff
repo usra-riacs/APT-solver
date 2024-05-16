@@ -5,20 +5,20 @@ message: >-
   metadata from this file.
 type: software
 authors:
-  - given-names: Mohseni
-    family-names: Masoud
-    affiliation: Hewlett Packard Enterprise
-    email: masoud.mohseni@hpe.com
-  - given-names: P. Aaron
-    family-names: Lott
-    email: plott@usra.edu
-    affiliation: Universities Space Research Association
-    orcid: 'https://orcid.org/0000-0002-9718-9641'
   - given-names: Navid
     family-names: Aadit
     email: maadit@ucsb.edu
     affiliation: University of California Santa Barbara
     orcid: 'https://orcid.org/0000-0001-9933-0728'
+  - given-names: P. Aaron
+    family-names: Lott
+    email: plott@usra.edu
+    affiliation: Universities Space Research Association
+    orcid: 'https://orcid.org/0000-0002-9718-9641'
+- given-names: Masoud
+    family-names: Mohseni
+    affiliation: Hewlett Packard Enterprise
+    email: masoud.mohseni@hpe.com
 repository-code: 'https://github.com/usra-riacs/APT-solver'
 version: 0.1.0
 date-released: '2023-08-04'
