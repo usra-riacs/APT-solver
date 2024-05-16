@@ -7,7 +7,7 @@ authors:
 - family-names: "Lisa"
   given-names: "Mona"
   orcid: "https://orcid.org/0000-0000-0000-0000"
-title: "APT-solver"
+title: "APT-solver: An Adaptive Parallel Tempering Solver"
 version: 1.0.0
 date-released: 2023-08-04
 url: "https://github.com/usra-riacs/APT-solver"
